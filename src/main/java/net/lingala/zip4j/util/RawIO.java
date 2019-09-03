@@ -25,6 +25,7 @@ import java.io.RandomAccessFile;
 
 public class RawIO {
 
+  private byte[] byteBuff = new byte[1];
   private byte[] shortBuff = new byte[2];
   private byte[] intBuff = new byte[4];
   private byte[] longBuff = new byte[8];
@@ -107,6 +108,20 @@ public class RawIO {
 
   public int readShortLittleEndian(byte[] buff, int position) {
     return (buff[position] & 0xff) | (buff[1 + position] & 0xff) << 8;
+  }
+
+  public int readByte(RandomAccessFile randomAccessFile) throws IOException {
+    randomAccessFile.readFully(byteBuff);
+    return readByte(byteBuff);
+  }
+
+  public int readByte(InputStream inputStream) throws IOException {
+    readFully(inputStream, byteBuff, byteBuff.length);
+    return readByte(byteBuff);
+  }
+
+  public int readByte(byte[] buff) {
+    return buff[0] & 0xff;
   }
 
   public void writeShortLittleEndian(OutputStream outputStream, int value) throws IOException {
