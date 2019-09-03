@@ -5,7 +5,7 @@ public class SignatureHeader {
 
   private int archiveVersionMinor;
 
-  private int startHeaderCRC;
+  private long startHeaderCRC;
 
   private StartHeader startHeader;
 
@@ -25,11 +25,11 @@ public class SignatureHeader {
     this.archiveVersionMinor = archiveVersionMinor;
   }
 
-  public int getStartHeaderCRC() {
+  public long getStartHeaderCRC() {
     return startHeaderCRC;
   }
 
-  public void setStartHeaderCRC(int startHeaderCRC) {
+  public void setStartHeaderCRC(long startHeaderCRC) {
     this.startHeaderCRC = startHeaderCRC;
   }
 

@@ -5,7 +5,7 @@ public class StartHeader {
 
   private long nextHeaderSize;
 
-  private int nextHeaderCRC;
+  private long nextHeaderCRC;
 
   public long getNextHeaderOffset() {
     return nextHeaderOffset;
@@ -23,11 +23,11 @@ public class StartHeader {
     this.nextHeaderSize = nextHeaderSize;
   }
 
-  public int getNextHeaderCRC() {
+  public long getNextHeaderCRC() {
     return nextHeaderCRC;
   }
 
-  public void setNextHeaderCRC(int nextHeaderCRC) {
+  public void setNextHeaderCRC(long nextHeaderCRC) {
     this.nextHeaderCRC = nextHeaderCRC;
   }
 }

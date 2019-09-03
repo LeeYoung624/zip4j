@@ -8,8 +8,7 @@ public class SevenZipModel {
   /// pack info in seven zip header
   private PackInfo packInfo;
 
-  /// Properties of solid compression blocks.
-  private Folder[] folders;
+  private CodersInfo codersInfo;
   /// Temporary properties for non-empty files (subsumed into the files array later).
 //  SubStreamsInfo subStreamsInfo;
   /// The files and directories in the archive.
@@ -34,11 +33,11 @@ public class SevenZipModel {
     this.packInfo = packInfo;
   }
 
-  public Folder[] getFolders() {
-    return folders;
+  public CodersInfo getCodersInfo() {
+    return codersInfo;
   }
 
-  public void setFolders(Folder[] folders) {
-    this.folders = folders;
+  public void setCodersInfo(CodersInfo codersInfo) {
+    this.codersInfo = codersInfo;
   }
 }

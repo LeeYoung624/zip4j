@@ -9,9 +9,30 @@ public class PackInfo {
   // Size of each packed stream
   private long[] packSizes;
 
-  // Whether each particular packed streams has a CRC.
-  private BitSet packCrcsDefined;
+  // crc info digeests
+  private Digests digests;
 
-  // CRCs for each packed stream that has a CRC
-  private int[] CRCs;
+  public long getPackPos() {
+    return packPos;
+  }
+
+  public void setPackPos(long packPos) {
+    this.packPos = packPos;
+  }
+
+  public long[] getPackSizes() {
+    return packSizes;
+  }
+
+  public void setPackSizes(long[] packSizes) {
+    this.packSizes = packSizes;
+  }
+
+  public Digests getDigests() {
+    return digests;
+  }
+
+  public void setDigests(Digests digests) {
+    this.digests = digests;
+  }
 }
