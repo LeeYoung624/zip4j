@@ -4,6 +4,11 @@ public class CodersInfo {
   /// Properties of solid compression blocks.
   private Folder[] folders;
 
-  // crc digests
-  private Digests digests;
+  public Folder[] getFolders() {
+    return folders;
+  }
+
+  public void setFolders(Folder[] folders) {
+    this.folders = folders;
+  }
 }

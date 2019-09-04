@@ -7,6 +7,9 @@ import net.lingala.zip4j.util.RawIO;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.BitSet;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.zip.CRC32;
 import java.util.zip.ZipException;
 
@@ -150,7 +153,7 @@ public class SevenZipHeaderReader {
 
     int propertyType = rawIO.readByte(sevenZipRaf);
     while(propertyType != InternalSevenZipConstants.kEnd) {
-      propertySize = SevenZipHeaderUtil.readSevenZipUint64(rawIO, sevenZipRaf);
+      propertySize = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
       // fixme:long is converted to int here,need to add some assert detection
       property = new byte[(int)propertySize];
       // todo: is property stored as little endian or not? where are these properties used?
@@ -189,6 +192,14 @@ public class SevenZipHeaderReader {
       readPackInfo(sevenZipRaf);
       tempByte = rawIO.readByte(sevenZipRaf);
     }
+
+    // read coders info if it exists
+    if(tempByte == InternalSevenZipConstants.kUnpackInfo) {
+      readCodersInfo(sevenZipRaf);
+      tempByte = rawIO.readByte(sevenZipRaf);
+
+      // todo: what if no coders info ?
+    }
   }
 
   /**
@@ -217,9 +228,9 @@ public class SevenZipHeaderReader {
     sevenZipModel.setPackInfo(packInfo);
 
     // read pack position
-    packInfo.setPackPos(SevenZipHeaderUtil.readSevenZipUint64(rawIO, sevenZipRaf));
+    packInfo.setPackPos(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
 
-    final long numPackStreamsLong = SevenZipHeaderUtil.readSevenZipUint64(rawIO, sevenZipRaf);
+    final long numPackStreamsLong = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
     // fixme: convert long to int here
     final int numPackStreamsInt = (int) numPackStreamsLong;
 
@@ -228,7 +239,7 @@ public class SevenZipHeaderReader {
     if(tempByte == InternalSevenZipConstants.kSize) {
       long[] packSizes = new long[numPackStreamsInt];
       for(int i = 0; i < numPackStreamsInt;i++) {
-        packSizes[i] = SevenZipHeaderUtil.readSevenZipUint64(rawIO, sevenZipRaf);
+        packSizes[i] = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
       }
       packInfo.setPackSizes(packSizes);
 
@@ -244,9 +255,283 @@ public class SevenZipHeaderReader {
     }
 
     if(tempByte != InternalSevenZipConstants.kEnd) {
-      // todo: throw new excepiton
-      throw new ZipException("7z read pack info error, end byte should be kEnd(0) but got " + tempByte);
+      throw new ZipException("7z read pack info error, end byte should be kEnd but got " + tempByte);
     }
+  }
+
+  /**
+   * Coders Info
+   * ~~~~~~~~~~~
+   *
+   *   BYTE NID::kUnPackInfo  (0x07)
+   *
+   *
+   *   BYTE NID::kFolder  (0x0B)
+   *   UINT64 NumFolders
+   *   BYTE External
+   *   switch(External)
+   *   {
+   *     case 0:
+   *       Folders[NumFolders]
+   *     case 1:
+   *       UINT64 DataStreamIndex
+   *   }
+   *
+   *
+   *   BYTE ID::kCodersUnPackSize  (0x0C)
+   *   for(Folders)
+   *     for(Folder.NumOutStreams)
+   *      UINT64 UnPackSize;
+   *
+   *
+   *   []
+   *   BYTE NID::kCRC   (0x0A)
+   *   UnPackDigests[NumFolders]
+   *   []
+   *
+   *
+   *
+   *   BYTE NID::kEnd
+   *
+   * @param sevenZipRaf
+   * @throws IOException
+   */
+  private void readCodersInfo(RandomAccessFile sevenZipRaf) throws IOException {
+    CodersInfo codersInfo = new CodersInfo();
+    sevenZipModel.setCodersInfo(codersInfo);
+
+    int tempByte = rawIO.readByte(sevenZipRaf);
+    if(tempByte != InternalSevenZipConstants.kFolder) {
+      throw new ZipException("7z read coders info failed, kFolder is expected but got " + tempByte);
+    }
+
+    final long numFolders = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+    // fixme:numFolders transform to int
+    final int numFoldersInt = (int)numFolders;
+    final int external = rawIO.readByte(sevenZipRaf);
+
+    Folder[] folders = new Folder[numFoldersInt];
+    codersInfo.setFolders(folders);
+    if(external == 0) {
+      for(int i = 0; i < numFolders;i++) {
+        folders[i] = readFolder(sevenZipRaf);
+      }
+    } else {
+      //todo: datastreamindex?
+    }
+
+    // read unpack size
+    tempByte = rawIO.readByte(sevenZipRaf);
+    if(tempByte != InternalSevenZipConstants.kCodersUnpackSize) {
+      throw new ZipException("7z read coders info failed, kCodersUnpackSize is expected but got " + tempByte);
+    }
+
+    for(Folder folder : folders) {
+      // todo:convert from long to int here
+      final int numOutStreamsTotalInt = (int) folder.getNumOutStreamsTotal();
+      long[] unpackSizes = new long[numOutStreamsTotalInt];
+      for(int i = 0; i < numOutStreamsTotalInt;i++) {
+        unpackSizes[i] = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+      }
+      folder.setUnpackSizes(unpackSizes);
+    }
+
+    tempByte = rawIO.readByte(sevenZipRaf);
+    // read crc info if it exists
+    if(tempByte == InternalSevenZipConstants.kCRC) {
+      // put crc info in each Folder object
+      Digests unpackDigests = readDigests(sevenZipRaf, numFoldersInt);
+      for(int i = 0;i < numFoldersInt;i++) {
+        if(unpackDigests.getCrcDefinedBitSet().get(i)) {
+          folders[i].setHasCrc(true);
+          folders[i].setCrc(unpackDigests.getCRCs()[i]);
+        } else {
+          folders[i].setHasCrc(false);
+        }
+      }
+      tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    if(tempByte != InternalSevenZipConstants.kEnd) {
+      throw new ZipException("7z read coders info failed, kEnd is expected but got " + tempByte);
+    }
+
+  }
+
+  /**
+   * Folder
+   * ~~~~~~
+   *   UINT64 NumCoders;
+   *   for (NumCoders)
+   *   {
+   *     BYTE
+   *     {
+   *       0:3 CodecIdSize
+   *       4:  Is Complex Coder
+   *       5:  There Are Attributes
+   *       6:  Reserved
+   *       7:  There are more alternative methods. (Not used anymore, must be 0).
+   *     }
+   *     BYTE CodecId[CodecIdSize]
+   *     if (Is Complex Coder)
+   *     {
+   *       UINT64 NumInStreams;
+   *       UINT64 NumOutStreams;
+   *     }
+   *     if (There Are Attributes)
+   *     {
+   *       UINT64 PropertiesSize
+   *       BYTE Properties[PropertiesSize]
+   *     }
+   *   }
+   *
+   *   NumBindPairs = NumOutStreamsTotal - 1;
+   *
+   *   for (NumBindPairs)
+   *   {
+   *     UINT64 InIndex;
+   *     UINT64 OutIndex;
+   *   }
+   *
+   *   NumPackedStreams = NumInStreamsTotal - NumBindPairs;
+   *   if (NumPackedStreams > 1)
+   *     for(NumPackedStreams)
+   *     {
+   *       UINT64 Index;
+   *     };
+   *
+   * @param sevenZipRaf
+   * @return
+   */
+  private Folder readFolder(RandomAccessFile sevenZipRaf) throws IOException {
+    Folder folder = new Folder();
+    final long numCoders = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+    // fixme: numCoders transform to int
+    final int numCodersInt = (int) numCoders;
+
+    Coder[] coders = new Coder[numCodersInt];
+    for(int i = 0; i < numCodersInt;i++) {
+      coders[i] = readCoder(sevenZipRaf);
+    }
+    folder.setCoders(coders);
+    long numInStreamsTotal = 0;
+    long numOutStreamsTotal = 0;
+    for (Coder coder: coders) {
+      numInStreamsTotal += coder.getNumInStreams();
+      numOutStreamsTotal += coder.getNumOutStreams();
+    }
+    folder.setNumInStreamsTotal(numInStreamsTotal);
+    folder.setNumOutStreamsTotal(numOutStreamsTotal);
+
+    // read bind pairs
+    // todo:assert numOutStreamsTotal > 0 ?
+    final long numBindPairs = numOutStreamsTotal - 1;
+    // todo:convert from long to int here
+    final int numBindPairsInt = (int) numBindPairs;
+    BindPair[] bindPairs = new BindPair[numBindPairsInt];
+    for(int i = 0; i < numBindPairsInt;i++) {
+      bindPairs[i].setInIndex(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
+      bindPairs[i].setOutIndex(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
+    }
+    folder.setBindPairs(bindPairs);
+
+    // read packed streams
+    if(numInStreamsTotal <= numBindPairs) {
+      throw new ZipException("7z read header failed, numInStreamsTotal should be greater than numBindPairs");
+    }
+    final long numPackedStreams = numInStreamsTotal - numBindPairs;
+    // todo:convert from long to int here
+    final int numPackedStreamsInt = (int) numPackedStreams;
+    long[] packedStreams = new long[numPackedStreamsInt];
+
+    if(numPackedStreamsInt == 1) {
+      // need to find out the packedStreams that is not in bind pairs
+      Set<Long> inIndexInBindPairsSet = new HashSet<Long>();
+      for(BindPair bindPair : bindPairs) {
+        inIndexInBindPairsSet.add(bindPair.getInIndex());
+      }
+
+      // todo: assert if more than 1 packed stream index is found, or can't find packed stream index
+      for(long i = 0;i < numInStreamsTotal;i++) {
+        if(!inIndexInBindPairsSet.contains(i)) {
+          packedStreams[0] = i;
+          break;
+        }
+      }
+    } else {
+      for(int i = 0; i < numPackedStreamsInt;i++) {
+        packedStreams[i] = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+      }
+    }
+
+    return folder;
+  }
+
+  /**
+   *     BYTE
+   *     {
+   *       0:3 CodecIdSize
+   *       4:  Is Complex Coder
+   *       5:  There Are Attributes
+   *       6:  Reserved
+   *       7:  There are more alternative methods. (Not used anymore, must be 0).
+   *     }
+   *     BYTE CodecId[CodecIdSize]
+   *     if (Is Complex Coder)
+   *     {
+   *       UINT64 NumInStreams;
+   *       UINT64 NumOutStreams;
+   *     }
+   *     if (There Are Attributes)
+   *     {
+   *       UINT64 PropertiesSize
+   *       BYTE Properties[PropertiesSize]
+   *     }
+   *
+   * @param sevenZipRaf
+   * @return
+   * @throws IOException
+   */
+  private Coder readCoder(RandomAccessFile sevenZipRaf) throws IOException {
+    Coder coder = new Coder();
+
+    final int coderInfoByte = rawIO.readByte(sevenZipRaf);
+    final int codercIdSize = coderInfoByte & 0x0f;
+    final boolean isComplexCoder = (coderInfoByte & 0x10) != 0;
+    coder.setComplexCoder(isComplexCoder);
+    final boolean isHasAttributes = (coderInfoByte & 0x20) != 0;
+    final boolean isHasAlternativeMethods = (coderInfoByte & 0x80) != 0;
+
+    if(isHasAlternativeMethods) {
+      throw new IOException("alternative methods bit is not used yet, must be 0");
+    }
+
+    // read codecid
+    byte[] codecId = new byte[codercIdSize];
+    sevenZipRaf.readFully(codecId);
+    coder.setCodecId(codecId);
+
+    // read numInStreams and numOutStreams
+    if(coder.isComplexCoder()) {
+      coder.setNumInStreams(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
+      coder.setNumOutStreams(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
+    } else {
+      coder.setNumInStreams(1L);
+      coder.setNumOutStreams(1L);
+    }
+
+    // read attributes if it exists
+    if(isHasAttributes) {
+      final long propertiesSize = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+      // fixme: transform long to int
+      final int propertiesSizeInt = (int)propertiesSize;
+      byte[] properties = new byte[propertiesSizeInt];
+      sevenZipRaf.readFully(properties);
+
+      coder.setProperties(properties);
+    }
+
+    return coder;
   }
 
   private Digests readDigests(RandomAccessFile sevenZipRaf, int numStreams) throws IOException {

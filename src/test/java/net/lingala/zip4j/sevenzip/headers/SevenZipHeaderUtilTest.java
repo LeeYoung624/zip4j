@@ -16,8 +16,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class SevenZipHeaderUtilTest {
   protected File testFile;
 
-  protected RawIO rawIO = new RawIO();
-
   protected RandomAccessFile testFileRaf;
 
   @Rule
@@ -54,47 +52,47 @@ public class SevenZipHeaderUtilTest {
     testData = new byte[] {(byte)0x7f, (byte)0xff , (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff};
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x7fL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x7fL);
 
     testData[0] = (byte)0xbf;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x3fffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x3fffL);
 
     testData[0] = (byte)0xdf;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x1fffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x1fffffL);
 
     testData[0] = (byte)0xef;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x0fffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x0fffffffL);
 
     testData[0] = (byte)0xf7;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x07ffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x07ffffffffL);
 
     testData[0] = (byte)0xfb;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x03ffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x03ffffffffffL);
 
     testData[0] = (byte)0xfd;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x01ffffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x01ffffffffffffL);
 
     testData[0] = (byte)0xfe;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x00ffffffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x00ffffffffffffffL);
 
     testData[0] = (byte)0xff;
     cleanUpTestFileAndWriteData(testData);
     testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(rawIO, testFileRaf)).isEqualTo(0x00ffffffffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x00ffffffffffffffffL);
   }
 
   private void cleanUpTestFileAndWriteData(byte[] dataToWrite) throws IOException {

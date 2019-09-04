@@ -6,10 +6,10 @@ public class Folder {
 
   /// Total number of input streams across all coders.
   /// this field is currently unused but technically part of the 7z API
-  private long numInputStreamsTotal;
+  private long numInStreamsTotal;
 
   /// Total number of output streams across all coders.
-  private long numOutputStreamsTotal;
+  private long numOutStreamsTotal;
 
   /// Mapping between input and output streams.
   private BindPair[] bindPairs;
@@ -30,4 +30,76 @@ public class Folder {
   /// output streams and the number of non-empty files in this
   /// folder.
   private int numUnpackSubStreams;
+
+  public Coder[] getCoders() {
+    return coders;
+  }
+
+  public void setCoders(Coder[] coders) {
+    this.coders = coders;
+  }
+
+  public long getNumInStreamsTotal() {
+    return numInStreamsTotal;
+  }
+
+  public void setNumInStreamsTotal(long numInStreamsTotal) {
+    this.numInStreamsTotal = numInStreamsTotal;
+  }
+
+  public long getNumOutStreamsTotal() {
+    return numOutStreamsTotal;
+  }
+
+  public void setNumOutStreamsTotal(long numOutStreamsTotal) {
+    this.numOutStreamsTotal = numOutStreamsTotal;
+  }
+
+  public BindPair[] getBindPairs() {
+    return bindPairs;
+  }
+
+  public void setBindPairs(BindPair[] bindPairs) {
+    this.bindPairs = bindPairs;
+  }
+
+  public long[] getPackedStreams() {
+    return packedStreams;
+  }
+
+  public void setPackedStreams(long[] packedStreams) {
+    this.packedStreams = packedStreams;
+  }
+
+  public long[] getUnpackSizes() {
+    return unpackSizes;
+  }
+
+  public void setUnpackSizes(long[] unpackSizes) {
+    this.unpackSizes = unpackSizes;
+  }
+
+  public boolean isHasCrc() {
+    return hasCrc;
+  }
+
+  public void setHasCrc(boolean hasCrc) {
+    this.hasCrc = hasCrc;
+  }
+
+  public long getCrc() {
+    return crc;
+  }
+
+  public void setCrc(long crc) {
+    this.crc = crc;
+  }
+
+  public int getNumUnpackSubStreams() {
+    return numUnpackSubStreams;
+  }
+
+  public void setNumUnpackSubStreams(int numUnpackSubStreams) {
+    this.numUnpackSubStreams = numUnpackSubStreams;
+  }
 }

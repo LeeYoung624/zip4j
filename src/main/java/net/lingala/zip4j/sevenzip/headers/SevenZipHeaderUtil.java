@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 
 public class SevenZipHeaderUtil {
+  private static RawIO rawIO = new RawIO();
+
   /**
    * UINT64 means real UINT64 encoded with the following scheme:
    *
@@ -19,12 +21,11 @@ public class SevenZipHeaderUtil {
    *   1111110x    BYTE y[6]  : (       x << (8 * 6)) + y
    *   11111110    BYTE y[7]  :                         y
    *   11111111    BYTE y[8]  :                         y
-   * @param rawIO
    * @param sevenZipRaf
    * @return
    * @throws IOException
    */
-  public static long readSevenZipUint64(RawIO rawIO, RandomAccessFile sevenZipRaf) throws IOException {
+  public static long readSevenZipUint64(RandomAccessFile sevenZipRaf) throws IOException {
     int uint64FirstByteMask = 0x80;
     final long firestByte = rawIO.readByte(sevenZipRaf);
 
