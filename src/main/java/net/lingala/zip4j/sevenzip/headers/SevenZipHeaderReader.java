@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.BitSet;
 import java.util.zip.CRC32;
+import java.util.zip.ZipException;
 
 /**
  * Helper class for reading 7zip headers, including signature header and header
@@ -42,7 +43,7 @@ public class SevenZipHeaderReader {
     // read digital signature
     long digitalSignature = rawIO.readLongLittleEndian(sevenZipRaf, InternalSevenZipConstants.DIGITAL_SIGNATURE_LENGTH);
     if(SevenZipHeaderSignature.SEVEN_ZIP_DIGTIAL_SIGNATURE.getValue() != digitalSignature) {
-      // todo: throw exception
+      throw new ZipException("7z file signature mismatch");
     }
 
     // read version
@@ -71,7 +72,7 @@ public class SevenZipHeaderReader {
 
     // verify crc
     if(crc32.getValue() != signatureHeader.getStartHeaderCRC()) {
-      // todo: throw exception
+      throw new ZipException("7z signature header crc32 validation failed");
     }
 
     sevenZipModel.setSignatureHeader(signatureHeader);
@@ -80,7 +81,7 @@ public class SevenZipHeaderReader {
   private void readHeader(RandomAccessFile sevenZipRaf) throws IOException {
     // verify crc
     if(!verifyHeaderCrc(sevenZipRaf)) {
-      // todo:throw exception
+      throw new ZipException("7z next header crc32 validation failed");
     }
 
     // header start position = signature_header_size + nextHeaderOffset
@@ -93,7 +94,7 @@ public class SevenZipHeaderReader {
       // uncompressed header read
       readUncompressedHeader(sevenZipRaf);
     } else {
-      // todo: throw exception
+      throw new ZipException("7z read next header failed, property id is expected to be kEncodedHeader or kHeader, but got " + headerFlag);
     }
   }
 
@@ -244,6 +245,7 @@ public class SevenZipHeaderReader {
 
     if(tempByte != InternalSevenZipConstants.kEnd) {
       // todo: throw new excepiton
+      throw new ZipException("7z read pack info error, end byte should be kEnd(0) but got " + tempByte);
     }
   }
 
