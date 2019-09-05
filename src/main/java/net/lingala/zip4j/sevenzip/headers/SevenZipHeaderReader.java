@@ -197,8 +197,12 @@ public class SevenZipHeaderReader {
     if(tempByte == InternalSevenZipConstants.kUnpackInfo) {
       readCodersInfo(sevenZipRaf);
       tempByte = rawIO.readByte(sevenZipRaf);
-
       // todo: what if no coders info ?
+    }
+
+    // read substreams info if it exists
+    if(tempByte == InternalSevenZipConstants.kSubStreamsInfo) {
+      readSubStreamsInfo(sevenZipRaf);
     }
   }
 
@@ -534,6 +538,168 @@ public class SevenZipHeaderReader {
     return coder;
   }
 
+  /**
+   * SubStreams Info
+   * ~~~~~~~~~~~~~~
+   *   BYTE NID::kSubStreamsInfo; (0x08)
+   *
+   *   []
+   *   BYTE NID::kNumUnPackStream; (0x0D)
+   *   UINT64 NumUnPackStreamsInFolders[NumFolders];
+   *   []
+   *
+   *
+   *   []
+   *   BYTE NID::kSize  (0x09)
+   *   UINT64 UnPackSizes[]
+   *   []
+   *
+   *
+   *   []
+   *   BYTE NID::kCRC  (0x0A)
+   *   Digests[Number of streams with unknown CRC]
+   *   []
+   *
+   *
+   *   BYTE NID::kEnd
+   *
+   * @param sevenZipRaf
+   * @throws IOException
+   */
+  private void readSubStreamsInfo(RandomAccessFile sevenZipRaf) throws IOException {
+    int tempByte = rawIO.readByte(sevenZipRaf);
+
+    long numUnpackStreamsInFolder;
+    int numUnpackStreamsInFolderInt;
+    // read num unpack stream info if it exists
+    if(tempByte == InternalSevenZipConstants.kNumUnpackStream) {
+      for(Folder folder : sevenZipModel.getCodersInfo().getFolders()) {
+        numUnpackStreamsInFolder = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+        // fixme: transform long to int here
+        numUnpackStreamsInFolderInt = (int) numUnpackStreamsInFolder;
+        folder.setNumUnpackStreams(numUnpackStreamsInFolderInt);
+      }
+
+      tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    int numUnpackStreamsInFoldersTotal = 0;
+    // calculate total number of unpack streams
+    for(Folder folder : sevenZipModel.getCodersInfo().getFolders()) {
+      numUnpackStreamsInFoldersTotal += folder.getNumUnpackStreams();
+    }
+
+    // init unpack sizez
+    long[] unpackSizes = new long[numUnpackStreamsInFoldersTotal];
+    SubStreamsInfo subStreamsInfo = new SubStreamsInfo();
+    subStreamsInfo.setUnpackSizes(unpackSizes);
+
+    // read unpack sizes info if it exists
+    Folder[] folders = sevenZipModel.getCodersInfo().getFolders();
+    if(tempByte == InternalSevenZipConstants.kSize) {
+      readSubStreamsSizesInfo(sevenZipRaf, unpackSizes, folders);
+      tempByte = rawIO.readByte(sevenZipRaf);
+    } else {
+      // put all size info from Folder level to SubStreamsInfo level
+      // if kSize is not presented, it means each Folder only has 1 unpack stream,
+      // then the unpack size equals to Folder.unpackSize
+      for(int i = 0; i < folders.length;i++) {
+        unpackSizes[i] = SevenZipHeaderUtil.getFolderUnpackSize(folders[i]);
+      }
+    }
+
+    // init sub streams crc digests info
+    Digests subStreamsDigests = new Digests();
+    BitSet subStreamsCrcDefinedBitSet = new BitSet(numUnpackStreamsInFoldersTotal);
+    long[] subStreamsCRCs = new long[numUnpackStreamsInFoldersTotal];
+    subStreamsDigests.setCrcDefinedBitSet(subStreamsCrcDefinedBitSet);
+    subStreamsDigests.setCRCs(subStreamsCRCs);
+    subStreamsInfo.setSubStreamsDigests(subStreamsDigests);
+
+    // read sub streams crc digests if it exists
+    if(tempByte == InternalSevenZipConstants.kCRC) {
+      readSubStreamsDigests(sevenZipRaf, folders, subStreamsCrcDefinedBitSet, subStreamsCRCs);
+      tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    if(tempByte != InternalSevenZipConstants.kEnd) {
+      throw new ZipException("7z read sub streams info failed, kEnd is expected but got " + tempByte);
+    }
+
+    sevenZipModel.setSubStreamsInfo(subStreamsInfo);
+  }
+
+  private void readSubStreamsSizesInfo(RandomAccessFile sevenZipRaf, long[] unpackSizes, Folder[] folders) throws IOException {
+    // read each unpack size
+    // notice that if a Folder has N unpack streams, only (N-1) unpack sizes will be listed here,
+    // the Nth unpack size can be calculated by Folder.unpackSize - SUM(unpack sizes of (N-1) streams)
+    long unpackSize;
+    int unpackSizesIndex = 0;
+    long sumUnpackSize;
+    for(Folder folder : folders) {
+      // if a folder does not contain unpack streams, then it should be skiped
+      if(folder.getNumUnpackStreams() == 0) {
+        continue;
+      }
+
+      sumUnpackSize = 0;
+      // calculate sum of N-1 unpack sizes of unpack streams, and put unpack sizes into SubStreamsInfo
+      for(int i = 0; i < (folder.getNumUnpackStreams() - 1);i++) {
+        unpackSize = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+        unpackSizes[unpackSizesIndex] = unpackSize;
+        sumUnpackSize += unpackSize;
+        unpackSizesIndex++;
+      }
+
+      unpackSizes[unpackSizesIndex] = SevenZipHeaderUtil.getFolderUnpackSize(folder) - sumUnpackSize;
+      unpackSizesIndex++;
+    }
+  }
+
+  /**
+   * only those unpack streams have CRC:
+   * unpack streams in folders with only 1 unpack streams and has crc in folder
+   *
+   * @param sevenZipRaf
+   * @param folders
+   * @param subStreamsCrcDefinedBitSet
+   * @param subStreamsCRCs
+   * @throws IOException
+   */
+  private void readSubStreamsDigests(RandomAccessFile sevenZipRaf, Folder[] folders, BitSet subStreamsCrcDefinedBitSet, long[] subStreamsCRCs) throws IOException {
+    int numOfStreamsWithUnknownCRC = 0;
+    for(Folder folder : folders) {
+      if(folder.getNumUnpackStreams() != 1 || !folder.isHasCrc() ) {
+        numOfStreamsWithUnknownCRC += folder.getNumUnpackStreams();
+      }
+    }
+
+    // read digests info of sub streams with unknown CRC
+    Digests subStreamsWithoutCRCDigests = readDigests(sevenZipRaf, numOfStreamsWithUnknownCRC);
+    int crcInSubStreamsIndex = 0;
+    int unknownCRCIndex = 0;
+    // put crc digests of streams with unknown CRC,
+    // and streams that already has CRC,
+    // to sub streams CRC digests
+    for(Folder folder : folders) {
+      if(folder.getNumUnpackStreams() == 1 && folder.isHasCrc()) {
+        // put CRC info into sub streams digests if it already has CRC
+        subStreamsCrcDefinedBitSet.set(crcInSubStreamsIndex);
+        subStreamsCRCs[crcInSubStreamsIndex] = folder.getCrc();
+        crcInSubStreamsIndex++;
+      } else {
+        // put other CRC info to sub streams digests
+        for(int i = 0; i < folder.getNumUnpackStreams();i++) {
+          subStreamsCrcDefinedBitSet.set(crcInSubStreamsIndex,
+                  subStreamsWithoutCRCDigests.getCrcDefinedBitSet().get(unknownCRCIndex));
+          subStreamsCRCs[crcInSubStreamsIndex] = subStreamsWithoutCRCDigests.getCRCs()[unknownCRCIndex];
+          crcInSubStreamsIndex++;
+          unknownCRCIndex++;
+        }
+      }
+    }
+  }
+
   private Digests readDigests(RandomAccessFile sevenZipRaf, int numStreams) throws IOException {
     Digests digests = new Digests();
     BitSet bitSet = new BitSet();
@@ -558,7 +724,6 @@ public class SevenZipHeaderReader {
       }
     } else {
       // all crcs are defined, set all bits to true
-      bitSet = new BitSet();
       for(int i = 0;i < numStreams;i++) {
         bitSet.set(i);
       }

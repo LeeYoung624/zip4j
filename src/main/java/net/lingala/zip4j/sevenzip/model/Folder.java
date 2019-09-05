@@ -28,8 +28,8 @@ public class Folder {
 
   /// The number of unpack substreams, product of the number of
   /// output streams and the number of non-empty files in this
-  /// folder.
-  private int numUnpackSubStreams;
+  /// folder. Default to be 1 : at least 1 output stream
+  private int numUnpackStreams = 1;
 
   public Coder[] getCoders() {
     return coders;
@@ -95,11 +95,11 @@ public class Folder {
     this.crc = crc;
   }
 
-  public int getNumUnpackSubStreams() {
-    return numUnpackSubStreams;
+  public int getNumUnpackStreams() {
+    return numUnpackStreams;
   }
 
-  public void setNumUnpackSubStreams(int numUnpackSubStreams) {
-    this.numUnpackSubStreams = numUnpackSubStreams;
+  public void setNumUnpackStreams(int numUnpackStreams) {
+    this.numUnpackStreams = numUnpackStreams;
   }
 }

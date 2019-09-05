@@ -1,9 +1,13 @@
 package net.lingala.zip4j.sevenzip.headers;
 
+import net.lingala.zip4j.sevenzip.model.BindPair;
+import net.lingala.zip4j.sevenzip.model.Folder;
 import net.lingala.zip4j.util.RawIO;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.HashSet;
+import java.util.Set;
 
 public class SevenZipHeaderUtil {
   private static RawIO rawIO = new RawIO();
@@ -48,5 +52,31 @@ public class SevenZipHeaderUtil {
     }
 
     return result;
+  }
+
+  /**
+   * Calculate unpack size of a folder. The unpack size should be the final output stream size
+   * To find the final output stream, you need to find the only one output stream that is not
+   * in bind pairs.
+   *
+   * @param folder
+   * @return
+   */
+  public static long getFolderUnpackSize(Folder folder) {
+    if(folder.getNumOutStreamsTotal() == 0) {
+      return 0;
+    }
+    Set<Long> outIndexInBindPairsSet = new HashSet<Long>();
+    for(BindPair bindPair : folder.getBindPairs()) {
+      outIndexInBindPairsSet.add(bindPair.getOutIndex());
+    }
+
+    for(int i = 0; i < folder.getNumOutStreamsTotal();i++) {
+      if(!outIndexInBindPairsSet.contains(i)) {
+        return folder.getUnpackSizes()[i];
+      }
+    }
+
+    return 0;
   }
 }
