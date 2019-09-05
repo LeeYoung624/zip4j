@@ -1,6 +1,6 @@
 package net.lingala.zip4j.sevenzip.headers;
 
-import net.lingala.zip4j.sevenzip.InternalSevenZipConstants;
+import net.lingala.zip4j.sevenzip.util.InternalSevenZipConstants;
 import net.lingala.zip4j.sevenzip.model.*;
 import net.lingala.zip4j.util.RawIO;
 
@@ -9,7 +9,6 @@ import java.io.RandomAccessFile;
 import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.zip.CRC32;
 import java.util.zip.ZipException;
 

@@ -1,4 +1,4 @@
-package net.lingala.zip4j.sevenzip;
+package net.lingala.zip4j.sevenzip.util;
 
 public class InternalSevenZipConstants {
   private InternalSevenZipConstants() {
