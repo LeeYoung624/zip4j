@@ -144,6 +144,17 @@ public class SevenZipHeaderReader {
       readStreamsInfo(sevenZipRaf);
       tempByte = rawIO.readByte(sevenZipRaf);
     }
+
+    // read files info if it exists
+    if(tempByte == InternalSevenZipConstants.kFilesInfo) {
+      readFilesInfo(sevenZipRaf);
+      tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    if(tempByte != InternalSevenZipConstants.kEnd) {
+      throw new ZipException("7z read uncompressed header error, end byte should be kEnd but got " + tempByte);
+    }
+
   }
 
   private void readArchiveProperties(RandomAccessFile sevenZipRaf) throws IOException {
@@ -202,6 +213,11 @@ public class SevenZipHeaderReader {
     // read substreams info if it exists
     if(tempByte == InternalSevenZipConstants.kSubStreamsInfo) {
       readSubStreamsInfo(sevenZipRaf);
+      tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    if(tempByte != InternalSevenZipConstants.kEnd) {
+      throw new ZipException("7z read streams info error, end byte should be kEnd but got " + tempByte);
     }
   }
 
@@ -697,6 +713,12 @@ public class SevenZipHeaderReader {
         }
       }
     }
+  }
+
+  private void readFilesInfo(RandomAccessFile sevenZipRaf) throws IOException {
+    final long numFiles = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+    // fixme : cast from long to int here
+    final int numFilesInt = (int) numFiles;
   }
 
   private Digests readDigests(RandomAccessFile sevenZipRaf, int numStreams) throws IOException {
