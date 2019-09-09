@@ -759,7 +759,7 @@ public class ZipFile {
    * @return ZipInputStream
    * @throws ZipException
    */
-  public ZipInputStream getInputStream(FileHeader fileHeader) throws ZipException {
+  public ZipInputStream getInputStream(FileHeader fileHeader) throws IOException {
     if (fileHeader == null) {
       throw new ZipException("FileHeader is null, cannot get InputStream");
     }
@@ -806,6 +806,14 @@ public class ZipFile {
   public List<File> getSplitZipFiles() throws ZipException {
     checkZipModel();
     return FileUtils.getSplitZipFiles(zipModel);
+  }
+
+  /**
+   * Sets a password to be used for the zip file. Will override if a password supplied via ZipFile constructor
+   * @param password - char array of the password to be used
+   */
+  public void setPassword(char[] password) {
+    this.password = password;
   }
 
   /**
