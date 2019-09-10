@@ -31,7 +31,7 @@ public class InternalSevenZipConstants {
   public static final int kCTime = 0x12;
   public static final int kATime = 0x13;
   public static final int kMTime = 0x14;
-  public static final int kWinAttributes = 0x15;
+  public static final int kAttributes = 0x15;
   public static final int kComment = 0x16;
   public static final int kEncodedHeader = 0x17;
   public static final int kStartPos = 0x18;

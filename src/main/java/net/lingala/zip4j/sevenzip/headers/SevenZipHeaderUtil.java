@@ -6,6 +6,7 @@ import net.lingala.zip4j.util.RawIO;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -78,5 +79,57 @@ public class SevenZipHeaderUtil {
     }
 
     return 0;
+  }
+
+  /**
+   * read bits in Byte size
+   *
+   * @param sevenZipRaf
+   * @param maxBits
+   * @return
+   * @throws IOException
+   */
+  public static BitSet readBitsAsBitSet(RandomAccessFile sevenZipRaf, int maxBits) throws IOException {
+    BitSet bitSet = new BitSet();
+    int numBitsDoneRead = 0;
+    int mask;
+    int numBitsToRead;
+    int tempByte;
+    while(numBitsDoneRead < maxBits) {
+      mask = 0x80;
+      numBitsToRead = maxBits - numBitsDoneRead > 8 ? 8:(maxBits - numBitsDoneRead);
+      tempByte = rawIO.readByte(sevenZipRaf);
+      for(int i = 0;i < numBitsToRead;i++) {
+        bitSet.set(numBitsDoneRead + i, (tempByte & mask) != 0);
+        mask >>>= 1;
+      }
+
+      numBitsDoneRead += numBitsToRead;
+    }
+
+    return bitSet;
+  }
+
+  /**
+   * read bits with all are defined flag
+   *
+   * @param sevenZipRaf
+   * @param maxBits
+   * @return
+   * @throws IOException
+   */
+  public static BitSet readBitsWithAllAreDefined(RandomAccessFile sevenZipRaf, int maxBits) throws IOException {
+    BitSet bitSet = new BitSet();
+    final int allAreDefined = rawIO.readByte(sevenZipRaf);
+    if(allAreDefined == 0) {
+      bitSet = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, maxBits);
+    } else {
+      // all crcs are defined, set all bits to true
+      for(int i = 0;i < maxBits;i++) {
+        bitSet.set(i);
+      }
+    }
+
+    return bitSet;
   }
 }

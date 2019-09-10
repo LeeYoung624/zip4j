@@ -12,7 +12,7 @@ public class SevenZipModel {
   /// Temporary properties for non-empty files (subsumed into the files array later).
   SubStreamsInfo subStreamsInfo;
   /// The files and directories in the archive.
-//  SevenZArchiveEntry[] files;
+  SevenZipFileEntry[] files;
   /// Mapping between folders, files and streams.
 //  StreamMap streamMap;
 
@@ -47,5 +47,13 @@ public class SevenZipModel {
 
   public void setSubStreamsInfo(SubStreamsInfo subStreamsInfo) {
     this.subStreamsInfo = subStreamsInfo;
+  }
+
+  public SevenZipFileEntry[] getFiles() {
+    return files;
+  }
+
+  public void setFiles(SevenZipFileEntry[] files) {
+    this.files = files;
   }
 }

@@ -6,6 +6,7 @@ import net.lingala.zip4j.util.RawIO;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -449,6 +450,7 @@ public class SevenZipHeaderReader {
     final int numBindPairsInt = (int) numBindPairs;
     BindPair[] bindPairs = new BindPair[numBindPairsInt];
     for(int i = 0; i < numBindPairsInt;i++) {
+      bindPairs[i] = new BindPair();
       bindPairs[i].setInIndex(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
       bindPairs[i].setOutIndex(SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf));
     }
@@ -715,40 +717,246 @@ public class SevenZipHeaderReader {
     }
   }
 
+  /**
+   * FilesInfo
+   * ~~~~~~~~~
+   *   BYTE NID::kFilesInfo;  (0x05)
+   *   UINT64 NumFiles
+   *
+   *   for (;;)
+   *   {
+   *     BYTE PropertyType;
+   *     if (aType == 0)
+   *       break;
+   *
+   *     UINT64 Size;
+   *
+   *     switch(PropertyType)
+   *     {
+   *       kEmptyStream:   (0x0E)
+   *         for(NumFiles)
+   *           BIT IsEmptyStream
+   *
+   *       kEmptyFile:     (0x0F)
+   *         for(EmptyStreams)
+   *           BIT IsEmptyFile
+   *
+   *       kAnti:          (0x10)
+   *         for(EmptyStreams)
+   *           BIT IsAntiFile
+   *
+   *       case kCTime: (0x12)
+   *       case kATime: (0x13)
+   *       case kMTime: (0x14)
+   *         BYTE AllAreDefined
+   *         if (AllAreDefined == 0)
+   *         {
+   *           for(NumFiles)
+   *             BIT TimeDefined
+   *         }
+   *         BYTE External;
+   *         if(External != 0)
+   *           UINT64 DataIndex
+   *         []
+   *         for(Definded Items)
+   *           REAL_UINT64 Time
+   *         []
+   *
+   *       kNames:     (0x11)
+   *         BYTE External;
+   *         if(External != 0)
+   *           UINT64 DataIndex
+   *         []
+   *         for(Files)
+   *         {
+   *           wchar_t Names[NameSize];
+   *           wchar_t 0;
+   *         }
+   *         []
+   *
+   *       kAttributes:  (0x15)
+   *         BYTE AllAreDefined
+   *         if (AllAreDefined == 0)
+   *         {
+   *           for(NumFiles)
+   *             BIT AttributesAreDefined
+   *         }
+   *         BYTE External;
+   *         if(External != 0)
+   *           UINT64 DataIndex
+   *         []
+   *         for(Definded Attributes)
+   *           UINT32 Attributes
+   *         []
+   *     }
+   *   }
+   *
+   * @param sevenZipRaf
+   * @throws IOException
+   */
   private void readFilesInfo(RandomAccessFile sevenZipRaf) throws IOException {
     final long numFiles = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
     // fixme : cast from long to int here
     final int numFilesInt = (int) numFiles;
+
+    // init seven zip file entries
+    SevenZipFileEntry[] fileEntries = new SevenZipFileEntry[numFilesInt];
+    for(int i = 0; i < numFilesInt;i++) {
+      fileEntries[i] = new SevenZipFileEntry();
+    }
+
+    int propertyType;
+    long size;
+    BitSet isEmptyStream = null;
+    BitSet isEmptyFile = null;
+    BitSet isAnti = null;
+    int external;
+    while(true) {
+      propertyType = rawIO.readByte(sevenZipRaf);
+      if(propertyType == 0) {
+        break;
+      }
+
+      size = SevenZipHeaderUtil.readSevenZipUint64(sevenZipRaf);
+      switch (propertyType) {
+        case InternalSevenZipConstants.kEmptyStream:
+          isEmptyStream = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, numFilesInt);
+          break;
+        case InternalSevenZipConstants.kEmptyFile:
+          if(isEmptyStream == null) {
+            throw new ZipException("error occur when reading files info : kEmptyStream must appear before kEmptyFile");
+          }
+
+          isEmptyFile = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, numFilesInt);
+          break;
+        case InternalSevenZipConstants.kAnti:
+          if(isEmptyStream == null) {
+            throw new ZipException("error occur when reading files info : kEmptyStream must appear before kAnti");
+          }
+
+          isAnti = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, numFilesInt);
+          break;
+        case InternalSevenZipConstants.kCTime:
+        case InternalSevenZipConstants.kATime:
+        case InternalSevenZipConstants.kMTime:
+          boolean hasDate;
+          long date = 0;
+          BitSet timeDefined = SevenZipHeaderUtil.readBitsWithAllAreDefined(sevenZipRaf, numFilesInt);
+          external = rawIO.readByte(sevenZipRaf);
+          if(external != 0) {
+            // todo : read data index
+          }
+
+          for(int i = 0; i < numFilesInt;i++) {
+            hasDate = timeDefined.get(i);
+            if(hasDate) {
+              date = rawIO.readLongLittleEndian(sevenZipRaf);
+            }
+            setFileTimeInfo(fileEntries[i], hasDate, date, propertyType);
+          }
+          break;
+        case InternalSevenZipConstants.kName:
+          external = rawIO.readByte(sevenZipRaf);
+          if(external != 0) {
+            // todo : read data index
+          }
+
+          // fixme : why?
+          if (((size - 1) & 1) != 0) {
+            throw new IOException("File names length invalid");
+          }
+
+          // todo : transform long to int
+          // fixme : why?
+          int numFileNamesInt = (int)size - 1;
+          byte[] names = new byte[numFileNamesInt];
+          sevenZipRaf.readFully(names);
+          int fileIndex = 0;
+          int nameStartByteIndex = 0;
+
+          // todo:why i += 2?
+          for(int i = 0; i < numFileNamesInt;i += 2) {
+            if (names[i] == 0 && names[i+1] == 0) {
+              fileEntries[fileIndex].setName(new String(names, nameStartByteIndex, i - nameStartByteIndex, StandardCharsets.UTF_16LE));
+              nameStartByteIndex = i + 2;
+              fileIndex++;
+            }
+          }
+
+          // todo : validate fileIndex == numFilesInt and nameStartByteIndex == numFileNamesInt
+          break;
+        case InternalSevenZipConstants.kAttributes:
+          BitSet attributeAreDefined = SevenZipHeaderUtil.readBitsWithAllAreDefined(sevenZipRaf, numFilesInt);
+          external = rawIO.readByte(sevenZipRaf);
+          if(external != 0) {
+            // todo : read data index
+          }
+
+          for(int i = 0; i < numFilesInt;i++) {
+            fileEntries[i].setHasAttributes(attributeAreDefined.get(i));
+            if(fileEntries[i].isHasAttributes()) {
+              fileEntries[i].setAttributes(rawIO.readIntLittleEndian(sevenZipRaf));
+            }
+          }
+          break;
+        default:
+          // todo : skip [size] bytes
+      }
+    }
+
+    int emptyFileIndex = 0;
+    int notEmptyFileIndex = 0;
+    for(int i = 0; i < numFilesInt;i++) {
+      if(isEmptyStream == null || !isEmptyStream.get(i)) {
+        fileEntries[i].setHasStream(true);
+        fileEntries[i].setDirectory(false);
+        fileEntries[i].setAntiItem(false);
+        fileEntries[i].setHasCrc(sevenZipModel.getSubStreamsInfo().getSubStreamsDigests().getCrcDefinedBitSet().get(notEmptyFileIndex));
+        fileEntries[i].setCrc(sevenZipModel.getSubStreamsInfo().getSubStreamsDigests().getCRCs()[notEmptyFileIndex]);
+        fileEntries[i].setSize(sevenZipModel.getSubStreamsInfo().getUnpackSizes()[notEmptyFileIndex]);
+        notEmptyFileIndex++;
+      } else {
+        fileEntries[i].setHasStream(false);
+        fileEntries[i].setDirectory(isEmptyFile == null || !isEmptyFile.get(emptyFileIndex));
+        fileEntries[i].setAntiItem(isAnti != null && isAnti.get(emptyFileIndex));
+        fileEntries[i].setHasCrc(false);
+        fileEntries[i].setSize(0L);
+        emptyFileIndex++;
+      }
+    }
+    sevenZipModel.setFiles(fileEntries);
+    calculateStreamMap(archive);
+  }
+
+  private void setFileTimeInfo(SevenZipFileEntry file, boolean hasDate, long date, int propertyType) {
+    switch(propertyType) {
+      case InternalSevenZipConstants.kCTime:
+        file.setHasCreationDate(hasDate);
+        if(hasDate) {
+          file.setCreationDate(date);
+        }
+        break;
+      case InternalSevenZipConstants.kATime:
+        file.setHasAccessDate(hasDate);
+        if(hasDate) {
+          file.setAccessDate(date);
+        }
+        break;
+      case InternalSevenZipConstants.kMTime:
+        file.setHasLastModifiedDate(hasDate);
+        if(hasDate) {
+          file.setLastModifiedDate(date);
+        }
+        break;
+      default:
+        return;
+    }
   }
 
   private Digests readDigests(RandomAccessFile sevenZipRaf, int numStreams) throws IOException {
     Digests digests = new Digests();
-    BitSet bitSet = new BitSet();
+    BitSet bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(sevenZipRaf, numStreams);
     digests.setCrcDefinedBitSet(bitSet);
-
-    final int allAreDefined = rawIO.readByte(sevenZipRaf);
-    if(allAreDefined == 0) {
-      int numStreamsDoneRead = 0;
-      int mask;
-      int numStreamsToRead;
-      int tempByte;
-      while(numStreamsDoneRead < numStreams) {
-        mask = 0x80;
-        numStreamsToRead = numStreams - numStreamsDoneRead > 8 ? 8:(numStreams - numStreamsDoneRead);
-        tempByte = rawIO.readByte(sevenZipRaf);
-        for(int i = 0;i < numStreamsToRead;i++) {
-          bitSet.set(numStreamsDoneRead + i, (tempByte & mask) != 0);
-          mask >>>= 1;
-        }
-
-        numStreamsDoneRead += numStreamsToRead;
-      }
-    } else {
-      // all crcs are defined, set all bits to true
-      for(int i = 0;i < numStreams;i++) {
-        bitSet.set(i);
-      }
-    }
 
     long[] CRCs = new long[numStreams];
     digests.setCRCs(CRCs);
