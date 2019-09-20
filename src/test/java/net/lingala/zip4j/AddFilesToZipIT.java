@@ -194,7 +194,7 @@ public class AddFilesToZipIT extends AbstractIT {
     assertThat(zipFile.getFileHeaders()).hasSize(1);
     assertThat(zipFile.getFileHeader("/data/newfile.txt")).isNotNull();
     assertThat(zipFile.getFileHeader("sample_text_large.txt")).isNull();
-    zipFile.extractAll(outputFolder.getCanonicalPath());
+    zipFile.extractAll(outputFolder.getPath());
   }
 
   @Test
@@ -555,6 +555,24 @@ public class AddFilesToZipIT extends AbstractIT {
     assertThat(percentBetweenZeroAndHundred).isTrue();
     assertThat(fileNameSet).isTrue();
     ZipFileVerifier.verifyZipFileByExtractingAllFiles(generatedZipFile, PASSWORD, outputFolder, 13);
+  }
+
+  @Test
+  public void testAddFolderWithNotNormalizedPath() throws IOException {
+    ZipFile zipFile = new ZipFile(generatedZipFile);
+    ZipParameters parameters = new ZipParameters();
+
+    String folderToAddPath = TestUtils.getTestFileFromResources("").getPath()
+        + InternalZipConstants.FILE_SEPARATOR + ".."
+        + InternalZipConstants.FILE_SEPARATOR
+        + TestUtils.getTestFileFromResources("").getName();
+    File folderToAdd = new File(folderToAddPath);
+    zipFile.addFolder(folderToAdd, parameters);
+
+    File fileToAdd = TestUtils.getTestFileFromResources("file_PDF_1MB.pdf");
+    zipFile.addFile(fileToAdd, parameters);
+
+    ZipFileVerifier.verifyZipFileByExtractingAllFiles(generatedZipFile, outputFolder, 13);
   }
 
   @Test
