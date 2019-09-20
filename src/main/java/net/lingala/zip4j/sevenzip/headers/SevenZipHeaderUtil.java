@@ -1,14 +1,13 @@
 package net.lingala.zip4j.sevenzip.headers;
 
 import net.lingala.zip4j.sevenzip.model.BindPair;
+import net.lingala.zip4j.sevenzip.model.Coder;
 import net.lingala.zip4j.sevenzip.model.Folder;
 import net.lingala.zip4j.util.RawIO;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.BitSet;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class SevenZipHeaderUtil {
   private static RawIO rawIO = new RawIO();
@@ -67,14 +66,14 @@ public class SevenZipHeaderUtil {
     if(folder.getNumOutStreamsTotal() == 0) {
       return 0;
     }
-    Set<Long> outIndexInBindPairsSet = new HashSet<Long>();
+    Set<Long> outIndexInBindPairsSet = new HashSet<>();
     for(BindPair bindPair : folder.getBindPairs()) {
       outIndexInBindPairsSet.add(bindPair.getOutIndex());
     }
 
-    for(int i = 0; i < folder.getNumOutStreamsTotal();i++) {
+    for(long i = 0L; i < folder.getNumOutStreamsTotal();i++) {
       if(!outIndexInBindPairsSet.contains(i)) {
-        return folder.getUnpackSizes()[i];
+        return folder.getUnpackSizes()[(int)i];
       }
     }
 
@@ -131,5 +130,53 @@ public class SevenZipHeaderUtil {
     }
 
     return bitSet;
+  }
+
+  /**
+   * get ordered coders for input packedStreamIndex, this can be get from bind pairs in folder
+   *
+   * @param folder
+   * @param packedStreamIndex
+   * @return
+   */
+  public static List<Coder> getOrderedCodersInFolder(Folder folder, long packedStreamIndex) {
+    List<Coder> orderedCoders = new ArrayList<>();
+    long inIndex = folder.getPackedStreams()[0];
+    Coder[] coders = folder.getCoders();
+    BindPair[] bindPairs = folder.getBindPairs();
+    int coderIndex;
+
+    while(true) {
+      orderedCoders.add(coders[(int)packedStreamIndex]);
+
+      coderIndex = SevenZipHeaderUtil.findCoderIndexByOutIndex(bindPairs, inIndex);
+      if(coderIndex == -1) {
+        break;
+      }
+      inIndex = bindPairs[coderIndex].getInIndex();
+    }
+
+    return orderedCoders;
+  }
+
+  private static int findCoderIndexByOutIndex(BindPair[] bindPairs, long outIndex) {
+    for(int i = 0; i < bindPairs.length;i++) {
+      if(bindPairs[i].getOutIndex() == outIndex) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  public static long getUnpackSizeForCoderInFolder(Folder folder, Coder coder) {
+    Coder[] coders = folder.getCoders();
+    for(int i = 0; i < coders.length;i++) {
+      if(coders[i] == coder) {
+        return folder.getUnpackSizes()[i];
+      }
+    }
+
+    return -1L;
   }
 }

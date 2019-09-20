@@ -1,11 +1,16 @@
 package net.lingala.zip4j.sevenzip.headers;
 
+import net.lingala.zip4j.model.enums.RandomAccessFileMode;
+import net.lingala.zip4j.progress.ProgressMonitor;
+import net.lingala.zip4j.sevenzip.tasks.ExtractSevenZipEncodedHeaderTask;
+import net.lingala.zip4j.sevenzip.tasks.ExtractSevenZipEncodedHeaderTask.ExtractSevenZipEncodedHeaderTaskParameters;
 import net.lingala.zip4j.sevenzip.util.InternalSevenZipConstants;
 import net.lingala.zip4j.sevenzip.model.*;
+import net.lingala.zip4j.tasks.AsyncZipTask;
 import net.lingala.zip4j.util.RawIO;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
+import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.HashSet;
@@ -26,6 +31,10 @@ public class SevenZipHeaderReader {
   private byte[] intBuff = new byte[4];
 
   private byte[] longBuff = new byte[8];
+
+  private ProgressMonitor progressMonitor = new ProgressMonitor();
+
+  private boolean runInThread = false;
 
   public SevenZipModel readAllHeaders(RandomAccessFile sevenZipRaf) throws IOException {
     sevenZipModel = new SevenZipModel();
@@ -90,15 +99,55 @@ public class SevenZipHeaderReader {
     // header start position = signature_header_size + nextHeaderOffset
     sevenZipRaf.seek(InternalSevenZipConstants.SIGNATURE_HEADER_SIZE + sevenZipModel.getSignatureHeader().getStartHeader().getNextHeaderOffset());
 
-    int headerFlag = rawIO.readByte(sevenZipRaf);
-    if(headerFlag == InternalSevenZipConstants.kEncodedHeader) {
+    int tempByte = rawIO.readByte(sevenZipRaf);
+    if(tempByte == InternalSevenZipConstants.kEncodedHeader) {
       // compressed header read
-    } else if (headerFlag == InternalSevenZipConstants.kHeader) {
+      sevenZipRaf = readCompressedHeader(sevenZipRaf, null);
+
+      // sevenZipModel is written in readCompressedHeader
+      sevenZipModel = new SevenZipModel();
+      tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    if (tempByte == InternalSevenZipConstants.kHeader) {
       // uncompressed header read
       readUncompressedHeader(sevenZipRaf);
     } else {
-      throw new ZipException("7z read next header failed, property id is expected to be kEncodedHeader or kHeader, but got " + headerFlag);
+      throw new ZipException("7z read next header failed, property id is expected to be kEncodedHeader or kHeader, but got " + tempByte);
     }
+  }
+
+  /**
+   * HeaderInfo
+   * ~~~~~~~~~~
+   *   []
+   *   BYTE NID::kEncodedHeader; (0x17)
+   *   StreamsInfo for Encoded Header
+   *   []
+   * @param sevenZipRaf
+   * @param password
+   * @throws IOException
+   */
+  private RandomAccessFile readCompressedHeader(RandomAccessFile sevenZipRaf, String password) throws IOException {
+    // compressed header is started with streams info
+    readStreamsInfo(sevenZipRaf);
+
+    // there should be only one folder
+    Folder compressedHeaderFolder = sevenZipModel.getCodersInfo().getFolders()[0];
+    long compressedHeaderSize = sevenZipModel.getPackInfo().getPackSizes()[0];
+    long packOffset = InternalSevenZipConstants.SIGNATURE_HEADER_SIZE + sevenZipModel.getPackInfo().getPackPos();
+    sevenZipRaf.seek(packOffset);
+    InputStream sevenZipIS = Channels.newInputStream(sevenZipRaf.getChannel());
+
+    ExtractSevenZipEncodedHeaderTask task = new ExtractSevenZipEncodedHeaderTask(progressMonitor, runInThread);
+    task.execute(new ExtractSevenZipEncodedHeaderTaskParameters(sevenZipIS, compressedHeaderFolder));
+    byte[] header = task.getResult();
+
+    File tempFile = File.createTempFile("tempSevenZipFile", ".tmp");
+    OutputStream outputStream = new FileOutputStream(tempFile);
+    outputStream.write(header);
+
+    return new RandomAccessFile(tempFile, RandomAccessFileMode.READ.getValue());
   }
 
   /**
@@ -364,7 +413,8 @@ public class SevenZipHeaderReader {
       for(int i = 0;i < numFoldersInt;i++) {
         if(unpackDigests.getCrcDefinedBitSet().get(i)) {
           folders[i].setHasCrc(true);
-          folders[i].setCrc(unpackDigests.getCRCs()[i]);
+          // ignore other bits by & 0xFFFFFFFFL
+          folders[i].setCrc(unpackDigests.getCRCs()[i] & 0xFFFFFFFFL);
         } else {
           folders[i].setHasCrc(false);
         }
@@ -464,6 +514,7 @@ public class SevenZipHeaderReader {
     // todo:convert from long to int here
     final int numPackedStreamsInt = (int) numPackedStreams;
     long[] packedStreams = new long[numPackedStreamsInt];
+    folder.setPackedStreams(packedStreams);
 
     if(numPackedStreamsInt == 1) {
       // need to find out the packedStreams that is not in bind pairs
@@ -925,7 +976,7 @@ public class SevenZipHeaderReader {
       }
     }
     sevenZipModel.setFiles(fileEntries);
-    calculateStreamMap(archive);
+//    calculateStreamMap(archive);
   }
 
   private void setFileTimeInfo(SevenZipFileEntry file, boolean hasDate, long date, int propertyType) {
