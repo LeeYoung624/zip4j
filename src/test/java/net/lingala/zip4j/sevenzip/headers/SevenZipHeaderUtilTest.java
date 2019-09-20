@@ -1,7 +1,9 @@
 package net.lingala.zip4j.sevenzip.headers;
 
 import net.lingala.zip4j.model.enums.RandomAccessFileMode;
-import net.lingala.zip4j.util.RawIO;
+import net.lingala.zip4j.sevenzip.model.BindPair;
+import net.lingala.zip4j.sevenzip.model.Folder;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -10,6 +12,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.BitSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,8 +48,6 @@ public class SevenZipHeaderUtilTest {
 
   @Test
   public void testSevenZipReadUint64() throws IOException {
-    FileOutputStream outputStream = new FileOutputStream(testFile);
-
     byte[] testData;
 
     testData = new byte[] {(byte)0x7f, (byte)0xff , (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff};
@@ -100,5 +101,61 @@ public class SevenZipHeaderUtilTest {
     FileOutputStream outputStream = new FileOutputStream(testFile);
     outputStream.write(dataToWrite);
     outputStream.close();
+  }
+  
+  @Test
+  public void testGetFolderUnpackSize() {
+    Folder folder = new Folder();
+    assertThat(SevenZipHeaderUtil.getFolderUnpackSize(folder)).isEqualTo(0);
+
+    folder.setNumOutStreamsTotal(2);
+
+    BindPair[] bindPairs = new BindPair[2];
+    folder.setBindPairs(bindPairs);
+
+    BindPair bindPair0 = new BindPair();
+    bindPair0.setOutIndex(0);
+    bindPairs[0] = bindPair0;
+
+    BindPair bindPair1 = new BindPair();
+    bindPair1.setOutIndex(1);
+    bindPairs[1] = bindPair1;
+
+    assertThat(SevenZipHeaderUtil.getFolderUnpackSize(folder)).isEqualTo(0);
+
+    folder.setNumOutStreamsTotal(3);
+    long[] unpackSizes = { 1, 2, 3 };
+    folder.setUnpackSizes(unpackSizes);
+    assertThat(SevenZipHeaderUtil.getFolderUnpackSize(folder)).isEqualTo(3);
+  }
+
+  @Test
+  public void testReadBitsWithAllAreDefined() throws IOException {
+    // 0xCF binary is 11001111, 0xBF binary is 10111111
+    byte[] testData = new byte[] { 1, (byte) 0xCF, (byte) 0xBF };
+    cleanUpTestFileAndWriteData(testData);
+    testFileRaf.seek(0);
+    int maxBits = 10;
+    BitSet bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(testFileRaf, maxBits);
+    for (int i = 0; i < maxBits; i++) {
+      assertThat(bitSet.get(i)).isEqualTo(true);
+    }
+
+    testData[0] = 0;
+    cleanUpTestFileAndWriteData(testData);
+    testFileRaf.seek(0);
+    bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(testFileRaf, maxBits);
+    assertThat(bitSet.get(0)).isEqualTo(true);
+    assertThat(bitSet.get(1)).isEqualTo(true);
+    assertThat(bitSet.get(2)).isEqualTo(false);
+    assertThat(bitSet.get(3)).isEqualTo(false);
+    assertThat(bitSet.get(4)).isEqualTo(true);
+    assertThat(bitSet.get(5)).isEqualTo(true);
+    assertThat(bitSet.get(6)).isEqualTo(true);
+    assertThat(bitSet.get(7)).isEqualTo(true);
+    assertThat(bitSet.get(8)).isEqualTo(true);
+    assertThat(bitSet.get(9)).isEqualTo(false);
+    assertThat(bitSet.get(10)).isEqualTo(false);
+    assertThat(bitSet.get(11)).isEqualTo(false);
   }
 }
