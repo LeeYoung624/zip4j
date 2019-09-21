@@ -6,12 +6,12 @@ import net.lingala.zip4j.sevenzip.tasks.ExtractSevenZipEncodedHeaderTask;
 import net.lingala.zip4j.sevenzip.tasks.ExtractSevenZipEncodedHeaderTask.ExtractSevenZipEncodedHeaderTaskParameters;
 import net.lingala.zip4j.sevenzip.util.InternalSevenZipConstants;
 import net.lingala.zip4j.sevenzip.model.*;
-import net.lingala.zip4j.tasks.AsyncZipTask;
 import net.lingala.zip4j.util.RawIO;
 
 import java.io.*;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -45,7 +45,7 @@ public class SevenZipHeaderReader {
     // read header
     readHeader(sevenZipRaf);
 
-    return null;
+    return sevenZipModel;
   }
 
   private void readSignatureHeader(RandomAccessFile sevenZipRaf) throws IOException {
@@ -102,7 +102,7 @@ public class SevenZipHeaderReader {
     int tempByte = rawIO.readByte(sevenZipRaf);
     if(tempByte == InternalSevenZipConstants.kEncodedHeader) {
       // compressed header read
-      sevenZipRaf = readCompressedHeader(sevenZipRaf, null);
+      sevenZipRaf = readEncodedHeader(sevenZipRaf, null);
 
       // sevenZipModel is written in readCompressedHeader
       sevenZipModel = new SevenZipModel();
@@ -128,7 +128,7 @@ public class SevenZipHeaderReader {
    * @param password
    * @throws IOException
    */
-  private RandomAccessFile readCompressedHeader(RandomAccessFile sevenZipRaf, String password) throws IOException {
+  private RandomAccessFile readEncodedHeader(RandomAccessFile sevenZipRaf, String password) throws IOException {
     // compressed header is started with streams info
     readStreamsInfo(sevenZipRaf);
 
@@ -143,6 +143,7 @@ public class SevenZipHeaderReader {
     task.execute(new ExtractSevenZipEncodedHeaderTaskParameters(sevenZipIS, compressedHeaderFolder));
     byte[] header = task.getResult();
 
+    // todo : write to a temp file, or use intputstream instead?
     File tempFile = File.createTempFile("tempSevenZipFile", ".tmp");
     OutputStream outputStream = new FileOutputStream(tempFile);
     outputStream.write(header);
@@ -199,6 +200,10 @@ public class SevenZipHeaderReader {
     if(tempByte == InternalSevenZipConstants.kFilesInfo) {
       readFilesInfo(sevenZipRaf);
       tempByte = rawIO.readByte(sevenZipRaf);
+    }
+
+    if(sevenZipModel.getFiles().length > 0 && sevenZipModel.getCodersInfo().getFolders().length > 0) {
+      calcRelationInFilesAndFolders();
     }
 
     if(tempByte != InternalSevenZipConstants.kEnd) {
@@ -1002,6 +1007,67 @@ public class SevenZipHeaderReader {
       default:
         return;
     }
+  }
+
+  /**
+   * calculate the relation between files and folders : a file should know its corresponding folder,
+   * and a folder should know its offset(which is the offset of the first file in this folder)
+   */
+  private void calcRelationInFilesAndFolders() {
+    int fileIndex;
+    int folderIndex = 0;
+    int fileInFolderCount = 1;
+    SevenZipFileEntry[] files = sevenZipModel.getFiles();
+    Folder[] folders = sevenZipModel.getCodersInfo().getFolders();
+    long[] packSizes = sevenZipModel.getPackInfo().getPackSizes();
+    long[] packOffsets = new long[packSizes.length];
+    long packedStreamOffsetTotal = 0;
+    int currentFolderPackSizeIndex = 0;
+    SevenZipFileEntry fileInFolder;
+    Folder tempFolder;
+
+    // calc pack offsets based on pack sizes
+    for(int i = 0; i < packSizes.length; i++) {
+      packOffsets[i] = packedStreamOffsetTotal;
+      packedStreamOffsetTotal += packSizes[i];
+    }
+
+    // calc pack stream offset of each folder, each folder may have many packed streams,
+    // only the offset of the fist packed stream need to be stored
+    for(Folder folder : folders) {
+      folder.setFolderPackStreamOffset(packOffsets[currentFolderPackSizeIndex]);
+      currentFolderPackSizeIndex += folder.getPackedStreams().length;
+    }
+
+
+    for(fileIndex = 0;fileIndex < files.length; fileIndex++) {
+      fileInFolder = files[fileIndex];
+      // some files don't have any streams, like some directories or empty files, they should be skipped
+      if(!fileInFolder.isHasStream() && fileInFolderCount == 1) {
+        fileInFolder.setCorrespondingFolder(null);
+        continue;
+      }
+      tempFolder = folders[folderIndex];
+
+      // the folders with no unpack streams should be skipped
+      while(tempFolder.getNumUnpackStreams() <= 0) {
+        folderIndex++;
+      }
+
+      fileInFolder.setCorrespondingFolder(tempFolder);
+      if(tempFolder.getFiles() == null) {
+        tempFolder.setFiles(new ArrayList<>());
+      }
+      tempFolder.getFiles().add(fileInFolder);
+
+      fileInFolderCount++;
+      // if a folder is finished, the folder index should ++
+      if(fileInFolderCount > tempFolder.getNumUnpackStreams()) {
+        fileInFolderCount = 1;
+        folderIndex++;
+      }
+    }
+    System.out.println(test);
   }
 
   private Digests readDigests(RandomAccessFile sevenZipRaf, int numStreams) throws IOException {
