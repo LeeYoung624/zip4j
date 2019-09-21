@@ -1,5 +1,7 @@
 package net.lingala.zip4j.sevenzip.model;
 
+import java.util.List;
+
 public class Folder {
   /// List of coders used in this folder, eg. one for compression, one for encryption.
   private Coder[] coders;
@@ -30,6 +32,11 @@ public class Folder {
   /// output streams and the number of non-empty files in this
   /// folder. Default to be 1 : at least 1 output stream
   private int numUnpackStreams = 1;
+
+  private List<SevenZipFileEntry> files;
+
+  // the offset of the folder, it equals to the offset of the first file belonging to this folder
+  private long folderPackStreamOffset;
 
   public Coder[] getCoders() {
     return coders;
@@ -101,5 +108,21 @@ public class Folder {
 
   public void setNumUnpackStreams(int numUnpackStreams) {
     this.numUnpackStreams = numUnpackStreams;
+  }
+
+  public List<SevenZipFileEntry> getFiles() {
+    return files;
+  }
+
+  public void setFiles(List<SevenZipFileEntry> files) {
+    this.files = files;
+  }
+
+  public long getFolderPackStreamOffset() {
+    return folderPackStreamOffset;
+  }
+
+  public void setFolderPackStreamOffset(long folderPackStreamOffset) {
+    this.folderPackStreamOffset = folderPackStreamOffset;
   }
 }

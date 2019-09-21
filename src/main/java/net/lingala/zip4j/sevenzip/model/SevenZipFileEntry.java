@@ -18,6 +18,8 @@ public class SevenZipFileEntry {
   private long compressedCrc;
   private long size;
   private long compressedSize;
+  private Folder correspondingFolder;
+  private long packStreamOffset;
 //  private Iterable<? extends SevenZMethodConfiguration> contentMethods;
 
 
@@ -155,5 +157,21 @@ public class SevenZipFileEntry {
 
   public void setCompressedSize(long compressedSize) {
     this.compressedSize = compressedSize;
+  }
+
+  public Folder getCorrespondingFolder() {
+    return correspondingFolder;
+  }
+
+  public void setCorrespondingFolder(Folder correspondingFolder) {
+    this.correspondingFolder = correspondingFolder;
+  }
+
+  public long getPackStreamOffset() {
+    return packStreamOffset;
+  }
+
+  public void setPackStreamOffset(long packStreamOffset) {
+    this.packStreamOffset = packStreamOffset;
   }
 }
