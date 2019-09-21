@@ -2,6 +2,7 @@ package net.lingala.zip4j.sevenzip.headers;
 
 import net.lingala.zip4j.model.enums.RandomAccessFileMode;
 import net.lingala.zip4j.sevenzip.model.BindPair;
+import net.lingala.zip4j.sevenzip.model.Coder;
 import net.lingala.zip4j.sevenzip.model.Folder;
 
 import org.junit.After;
@@ -13,6 +14,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.*;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -157,5 +159,46 @@ public class SevenZipHeaderUtilTest {
     assertThat(bitSet.get(9)).isEqualTo(false);
     assertThat(bitSet.get(10)).isEqualTo(false);
     assertThat(bitSet.get(11)).isEqualTo(false);
+  }
+  
+  @Test
+  public void testGetOrderedCodersInFolder() {
+    Folder folder = new Folder();
+
+    long[] packedStreams = { 0 };
+    folder.setPackedStreams(packedStreams);
+
+    Coder coder = new Coder();
+    Coder[] coders = new Coder[1];
+    coders[0] = coder;
+    folder.setCoders(coders);
+
+    BindPair bindPair = new BindPair();
+    // outIndex inIndex
+    bindPair.setOutIndex(0);
+    bindPair.setInIndex(1);
+    BindPair[] bindPairs = new BindPair[1];
+    bindPairs[0] = bindPair;
+    folder.setBindPairs(bindPairs);
+
+    long packedStreamIndex = 0;
+    List<Coder> coderList = SevenZipHeaderUtil.getOrderedCodersInFolder(folder, packedStreamIndex);
+    assertThat(coderList).isNotNull();
+    assertThat(coderList.size()).isEqualTo(1);
+    assertThat(coderList.get(0)).isEqualTo(coder);
+  }
+
+  @Test
+  public void testGetUnpackSizeForCoderInFolder() {
+    Folder folder = new Folder();
+    long[] unpackSizes = { 1024 };
+    folder.setUnpackSizes(unpackSizes);
+    Coder[] coders = new Coder[1];
+    folder.setCoders(coders);
+    Coder coder = new Coder();
+    assertThat(SevenZipHeaderUtil.getUnpackSizeForCoderInFolder(folder, coder)).isEqualTo(-1L);
+
+    coders[0] = coder;
+    assertThat(SevenZipHeaderUtil.getUnpackSizeForCoderInFolder(folder, coder)).isEqualTo(1024);
   }
 }
