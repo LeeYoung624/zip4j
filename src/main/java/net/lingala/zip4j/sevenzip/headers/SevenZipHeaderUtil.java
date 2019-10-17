@@ -6,6 +6,7 @@ import net.lingala.zip4j.sevenzip.model.Folder;
 import net.lingala.zip4j.util.RawIO;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.util.*;
 
@@ -25,13 +26,13 @@ public class SevenZipHeaderUtil {
    *   1111110x    BYTE y[6]  : (       x << (8 * 6)) + y
    *   11111110    BYTE y[7]  :                         y
    *   11111111    BYTE y[8]  :                         y
-   * @param sevenZipRaf
+   * @param inputStream
    * @return
    * @throws IOException
    */
-  public static long readSevenZipUint64(RandomAccessFile sevenZipRaf) throws IOException {
+  public static long readSevenZipUint64(InputStream inputStream) throws IOException {
     int uint64FirstByteMask = 0x80;
-    final long firestByte = rawIO.readByte(sevenZipRaf);
+    final long firestByte = rawIO.readByte(inputStream);
 
     int extraByteLength = 0;
     for(int i = 0; i < 8;i++,extraByteLength++) {
@@ -47,7 +48,7 @@ public class SevenZipHeaderUtil {
     long extraByte;
     for(int i = 0;i < extraByteLength;i++) {
       // convert int(rawIO.readByte) to long
-      extraByte = rawIO.readByte(sevenZipRaf);
+      extraByte = rawIO.readByte(inputStream);
       result |= extraByte << (8 * i);
     }
 
@@ -83,12 +84,12 @@ public class SevenZipHeaderUtil {
   /**
    * read bits in Byte size
    *
-   * @param sevenZipRaf
+   * @param inputStream
    * @param maxBits
    * @return
    * @throws IOException
    */
-  public static BitSet readBitsAsBitSet(RandomAccessFile sevenZipRaf, int maxBits) throws IOException {
+  public static BitSet readBitsAsBitSet(InputStream inputStream, int maxBits) throws IOException {
     BitSet bitSet = new BitSet();
     int numBitsDoneRead = 0;
     int mask;
@@ -97,7 +98,7 @@ public class SevenZipHeaderUtil {
     while(numBitsDoneRead < maxBits) {
       mask = 0x80;
       numBitsToRead = maxBits - numBitsDoneRead > 8 ? 8:(maxBits - numBitsDoneRead);
-      tempByte = rawIO.readByte(sevenZipRaf);
+      tempByte = rawIO.readByte(inputStream);
       for(int i = 0;i < numBitsToRead;i++) {
         bitSet.set(numBitsDoneRead + i, (tempByte & mask) != 0);
         mask >>>= 1;
@@ -112,16 +113,16 @@ public class SevenZipHeaderUtil {
   /**
    * read bits with all are defined flag
    *
-   * @param sevenZipRaf
+   * @param inputStream
    * @param maxBits
    * @return
    * @throws IOException
    */
-  public static BitSet readBitsWithAllAreDefined(RandomAccessFile sevenZipRaf, int maxBits) throws IOException {
+  public static BitSet readBitsWithAllAreDefined(InputStream inputStream, int maxBits) throws IOException {
     BitSet bitSet = new BitSet();
-    final int allAreDefined = rawIO.readByte(sevenZipRaf);
+    final int allAreDefined = rawIO.readByte(inputStream);
     if(allAreDefined == 0) {
-      bitSet = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, maxBits);
+      bitSet = SevenZipHeaderUtil.readBitsAsBitSet(inputStream, maxBits);
     } else {
       // all crcs are defined, set all bits to true
       for(int i = 0;i < maxBits;i++) {
@@ -136,7 +137,6 @@ public class SevenZipHeaderUtil {
    * get ordered coders for input packedStreamIndex, this can be get from bind pairs in folder
    *
    * @param folder
-   * @param packedStreamIndex
    * @return
    */
   public static List<Coder> getOrderedCodersInFolder(Folder folder) {

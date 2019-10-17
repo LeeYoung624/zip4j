@@ -53,49 +53,31 @@ public class SevenZipHeaderUtilTest {
     byte[] testData;
 
     testData = new byte[] {(byte)0x7f, (byte)0xff , (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xff};
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x7fL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x7fL);
 
     testData[0] = (byte)0xbf;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x3fffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x3fffL);
 
     testData[0] = (byte)0xdf;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x1fffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x1fffffL);
 
     testData[0] = (byte)0xef;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x0fffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x0fffffffL);
 
     testData[0] = (byte)0xf7;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x07ffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x07ffffffffL);
 
     testData[0] = (byte)0xfb;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x03ffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x03ffffffffffL);
 
     testData[0] = (byte)0xfd;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x01ffffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x01ffffffffffffL);
 
     testData[0] = (byte)0xfe;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x00ffffffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x00ffffffffffffffL);
 
     testData[0] = (byte)0xff;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    assertThat(SevenZipHeaderUtil.readSevenZipUint64(testFileRaf)).isEqualTo(0x00ffffffffffffffffL);
+    assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x00ffffffffffffffffL);
   }
 
   private void cleanUpTestFileAndWriteData(byte[] dataToWrite) throws IOException {
@@ -135,18 +117,14 @@ public class SevenZipHeaderUtilTest {
   public void testReadBitsWithAllAreDefined() throws IOException {
     // 0xCF binary is 11001111, 0xBF binary is 10111111
     byte[] testData = new byte[] { 1, (byte) 0xCF, (byte) 0xBF };
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
     int maxBits = 10;
-    BitSet bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(testFileRaf, maxBits);
+    BitSet bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(new ByteArrayInputStream(testData), maxBits);
     for (int i = 0; i < maxBits; i++) {
       assertThat(bitSet.get(i)).isEqualTo(true);
     }
 
     testData[0] = 0;
-    cleanUpTestFileAndWriteData(testData);
-    testFileRaf.seek(0);
-    bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(testFileRaf, maxBits);
+    bitSet = SevenZipHeaderUtil.readBitsWithAllAreDefined(new ByteArrayInputStream(testData), maxBits);
     assertThat(bitSet.get(0)).isEqualTo(true);
     assertThat(bitSet.get(1)).isEqualTo(true);
     assertThat(bitSet.get(2)).isEqualTo(false);

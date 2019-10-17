@@ -19,6 +19,8 @@ public class ExtractSevenZipEncodedHeaderTask extends AsyncZipTask<ExtractSevenZ
 
   private byte[] result;
 
+  private byte[] buffer = new byte[4096];
+
   public ExtractSevenZipEncodedHeaderTask(ProgressMonitor progressMonitor, boolean runInThread) {
     super(progressMonitor, runInThread);
   }
@@ -28,16 +30,13 @@ public class ExtractSevenZipEncodedHeaderTask extends AsyncZipTask<ExtractSevenZ
     // for compressed header, there should be only one packed stream, which is compressedHeaderFolder.getPackedStreams()[0]
     List<Coder> orderedCoders = SevenZipHeaderUtil.getOrderedCodersInFolder(taskParameters.compressedHeaderFolder);
     long unpackSize = 0L;
-    InputStream inputStream = taskParameters.inputStream;
-    for(Coder coder : orderedCoders) {
-      // todo : coder should have only 1 input stream and 1 output stream
-      unpackSize = SevenZipHeaderUtil.getUncompressedSizeForCoderInFolder(taskParameters.compressedHeaderFolder, coder);
-//      sevenZipCoder = SevenZipCompressionMethod.getCompressionMethodFromCode(coder).getSevenZipCoder();
-//      inputStream = sevenZipCoder.getInputStream(new BoundedInputStream(inputStream, taskParameters.compressedHeaderSize) );
-//      inputStream = sevenZipCoder.getInputStream(inputStream);
-
-      inputStream = SevenZipCompressionsInputStreamFactory.generateInputStream(inputStream, coder, unpackSize);
-    }
+//    InputStream inputStream = taskParameters.inputStream;
+//    for(Coder coder : orderedCoders) {
+//      // todo : coder should have only 1 input stream and 1 output stream
+//      unpackSize = SevenZipHeaderUtil.getUncompressedSizeForCoderInFolder(taskParameters.compressedHeaderFolder, coder);
+//      inputStream = SevenZipCompressionsInputStreamFactory.generateInputStream(inputStream, coder, unpackSize);
+//    }
+    InputStream inputStream = SevenZipCompressionsInputStreamFactory.generateFolderInputStream(taskParameters.inputStream, taskParameters.compressedHeaderFolder);
     result = new byte[(int)unpackSize];
     while(inputStream.read(result) > 0);
 
