@@ -37,6 +37,7 @@
         <mockito.version>2.28.2</mockito.version>
         <powermock.version>2.0.2</powermock.version>
         <xz.version>1.8</xz.version>
+        <commons-compress.version>1.19</commons-compress.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -81,6 +82,11 @@
             <artifactId>powermock-api-mockito2</artifactId>
             <version>${powermock.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>${commons-compress.version}</version>
         </dependency>
         <dependency>
             <groupId>org.tukaani</groupId>

@@ -2,11 +2,10 @@ package net.lingala.zip4j.sevenzip.tasks;
 
 import net.lingala.zip4j.exception.ZipException;
 import net.lingala.zip4j.progress.ProgressMonitor;
-import net.lingala.zip4j.sevenzip.coders.SevenZipCoder;
 import net.lingala.zip4j.sevenzip.headers.SevenZipHeaderUtil;
+import net.lingala.zip4j.sevenzip.io.inputstream.SevenZipCompressionsInputStreamFactory;
 import net.lingala.zip4j.sevenzip.model.Coder;
 import net.lingala.zip4j.sevenzip.model.Folder;
-import net.lingala.zip4j.sevenzip.model.enums.SevenZipCompressionMethod;
 import net.lingala.zip4j.tasks.AsyncZipTask;
 import net.lingala.zip4j.sevenzip.tasks.ExtractSevenZipEncodedHeaderTask.ExtractSevenZipEncodedHeaderTaskParameters;
 
@@ -27,16 +26,17 @@ public class ExtractSevenZipEncodedHeaderTask extends AsyncZipTask<ExtractSevenZ
   @Override
   protected void executeTask(ExtractSevenZipEncodedHeaderTaskParameters taskParameters, ProgressMonitor progressMonitor) throws IOException {
     // for compressed header, there should be only one packed stream, which is compressedHeaderFolder.getPackedStreams()[0]
-    List<Coder> orderedCoders = SevenZipHeaderUtil.getOrderedCodersInFolder(taskParameters.compressedHeaderFolder, taskParameters.compressedHeaderFolder.getPackedStreams()[0]);
-    SevenZipCompressionMethod compressionMethod;
+    List<Coder> orderedCoders = SevenZipHeaderUtil.getOrderedCodersInFolder(taskParameters.compressedHeaderFolder);
     long unpackSize = 0L;
     InputStream inputStream = taskParameters.inputStream;
-    SevenZipCoder sevenZipCoder;
     for(Coder coder : orderedCoders) {
       // todo : coder should have only 1 input stream and 1 output stream
-      unpackSize = SevenZipHeaderUtil.getUnpackSizeForCoderInFolder(taskParameters.compressedHeaderFolder, coder);
-      sevenZipCoder = SevenZipCompressionMethod.getCompressionMethodFromCode(coder).getSevenZipCoder();
-      inputStream = sevenZipCoder.decode(coder, inputStream, unpackSize);
+      unpackSize = SevenZipHeaderUtil.getUncompressedSizeForCoderInFolder(taskParameters.compressedHeaderFolder, coder);
+//      sevenZipCoder = SevenZipCompressionMethod.getCompressionMethodFromCode(coder).getSevenZipCoder();
+//      inputStream = sevenZipCoder.getInputStream(new BoundedInputStream(inputStream, taskParameters.compressedHeaderSize) );
+//      inputStream = sevenZipCoder.getInputStream(inputStream);
+
+      inputStream = SevenZipCompressionsInputStreamFactory.generateInputStream(inputStream, coder, unpackSize);
     }
     result = new byte[(int)unpackSize];
     while(inputStream.read(result) > 0);
@@ -68,12 +68,13 @@ public class ExtractSevenZipEncodedHeaderTask extends AsyncZipTask<ExtractSevenZ
 
   public static class ExtractSevenZipEncodedHeaderTaskParameters {
     private InputStream inputStream;
-
     private Folder compressedHeaderFolder;
+    private long compressedHeaderSize;
 
-    public ExtractSevenZipEncodedHeaderTaskParameters(InputStream inputStream, Folder compressedHeaderFolder) {
+    public ExtractSevenZipEncodedHeaderTaskParameters(InputStream inputStream, Folder compressedHeaderFolder, long compressedHeaderSize) {
       this.inputStream = inputStream;
       this.compressedHeaderFolder = compressedHeaderFolder;
+      this.compressedHeaderSize = compressedHeaderSize;
     }
   }
 }

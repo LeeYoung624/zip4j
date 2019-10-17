@@ -182,7 +182,7 @@ public class SevenZipHeaderUtilTest {
     folder.setBindPairs(bindPairs);
 
     long packedStreamIndex = 0;
-    List<Coder> coderList = SevenZipHeaderUtil.getOrderedCodersInFolder(folder, packedStreamIndex);
+    List<Coder> coderList = SevenZipHeaderUtil.getOrderedCodersInFolder(folder);
     assertThat(coderList).isNotNull();
     assertThat(coderList.size()).isEqualTo(1);
     assertThat(coderList.get(0)).isEqualTo(coder);
@@ -196,9 +196,9 @@ public class SevenZipHeaderUtilTest {
     Coder[] coders = new Coder[1];
     folder.setCoders(coders);
     Coder coder = new Coder();
-    assertThat(SevenZipHeaderUtil.getUnpackSizeForCoderInFolder(folder, coder)).isEqualTo(-1L);
+    assertThat(SevenZipHeaderUtil.getUncompressedSizeForCoderInFolder(folder, coder)).isEqualTo(-1L);
 
     coders[0] = coder;
-    assertThat(SevenZipHeaderUtil.getUnpackSizeForCoderInFolder(folder, coder)).isEqualTo(1024);
+    assertThat(SevenZipHeaderUtil.getUncompressedSizeForCoderInFolder(folder, coder)).isEqualTo(1024);
   }
 }

@@ -139,7 +139,7 @@ public class SevenZipHeaderUtil {
    * @param packedStreamIndex
    * @return
    */
-  public static List<Coder> getOrderedCodersInFolder(Folder folder, long packedStreamIndex) {
+  public static List<Coder> getOrderedCodersInFolder(Folder folder) {
     List<Coder> orderedCoders = new ArrayList<>();
     long inIndex = folder.getPackedStreams()[0];
     Coder[] coders = folder.getCoders();
@@ -147,7 +147,7 @@ public class SevenZipHeaderUtil {
     int coderIndex;
 
     while(true) {
-      orderedCoders.add(coders[(int)packedStreamIndex]);
+      orderedCoders.add(coders[(int)inIndex]);
 
       coderIndex = SevenZipHeaderUtil.findCoderIndexByOutIndex(bindPairs, inIndex);
       if(coderIndex == -1) {
@@ -169,7 +169,18 @@ public class SevenZipHeaderUtil {
     return -1;
   }
 
-  public static long getUnpackSizeForCoderInFolder(Folder folder, Coder coder) {
+  public static long getCompressedSizeForCoderInFolder(Folder folder, Coder coder) {
+    Coder[] coders = folder.getCoders();
+    for(int i = 0; i < coders.length;i++) {
+      if(coders[i] == coder) {
+        return folder.getUnpackSizes()[i];
+      }
+    }
+
+    return -1L;
+  }
+
+  public static long getUncompressedSizeForCoderInFolder(Folder folder, Coder coder) {
     Coder[] coders = folder.getCoders();
     for(int i = 0; i < coders.length;i++) {
       if(coders[i] == coder) {

@@ -140,7 +140,7 @@ public class SevenZipHeaderReader {
     InputStream sevenZipIS = Channels.newInputStream(sevenZipRaf.getChannel());
 
     ExtractSevenZipEncodedHeaderTask task = new ExtractSevenZipEncodedHeaderTask(progressMonitor, runInThread);
-    task.execute(new ExtractSevenZipEncodedHeaderTaskParameters(sevenZipIS, compressedHeaderFolder));
+    task.execute(new ExtractSevenZipEncodedHeaderTaskParameters(sevenZipIS, compressedHeaderFolder, compressedHeaderSize));
     byte[] header = task.getResult();
 
     // todo : write to a temp file, or use intputstream instead?
@@ -883,14 +883,14 @@ public class SevenZipHeaderReader {
             throw new ZipException("error occur when reading files info : kEmptyStream must appear before kEmptyFile");
           }
 
-          isEmptyFile = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, numFilesInt);
+          isEmptyFile = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, isEmptyStream.cardinality());
           break;
         case InternalSevenZipConstants.kAnti:
           if(isEmptyStream == null) {
             throw new ZipException("error occur when reading files info : kEmptyStream must appear before kAnti");
           }
 
-          isAnti = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, numFilesInt);
+          isAnti = SevenZipHeaderUtil.readBitsAsBitSet(sevenZipRaf, isEmptyStream.cardinality());
           break;
         case InternalSevenZipConstants.kCTime:
         case InternalSevenZipConstants.kATime:
@@ -1034,8 +1034,10 @@ public class SevenZipHeaderReader {
 
     // calc pack stream offset of each folder, each folder may have many packed streams,
     // only the offset of the fist packed stream need to be stored
+    // the pack size of each folder equals to the pack size of its first pack stream
     for(Folder folder : folders) {
       folder.setFolderPackStreamOffset(packOffsets[currentFolderPackSizeIndex]);
+      folder.setPackedSize(packSizes[currentFolderPackSizeIndex]);
       currentFolderPackSizeIndex += folder.getPackedStreams().length;
     }
 
@@ -1067,7 +1069,6 @@ public class SevenZipHeaderReader {
         folderIndex++;
       }
     }
-    System.out.println(test);
   }
 
   private Digests readDigests(RandomAccessFile sevenZipRaf, int numStreams) throws IOException {

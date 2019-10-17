@@ -38,6 +38,9 @@ public class Folder {
   // the offset of the folder, it equals to the offset of the first file belonging to this folder
   private long folderPackStreamOffset;
 
+  // the packed size of this folder, it equals to the pack size of ther first input stream
+  private long packedSize;
+
   public Coder[] getCoders() {
     return coders;
   }
@@ -124,5 +127,13 @@ public class Folder {
 
   public void setFolderPackStreamOffset(long folderPackStreamOffset) {
     this.folderPackStreamOffset = folderPackStreamOffset;
+  }
+
+  public long getPackedSize() {
+    return packedSize;
+  }
+
+  public void setPackedSize(long packedSize) {
+    this.packedSize = packedSize;
   }
 }
