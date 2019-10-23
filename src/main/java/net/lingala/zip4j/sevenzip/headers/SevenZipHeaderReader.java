@@ -218,7 +218,8 @@ public class SevenZipHeaderReader {
       tempByte = rawIO.readByte(inputStream);
     }
 
-    if(sevenZipModel.getFiles().length > 0 && sevenZipModel.getCodersInfo().getFolders().length > 0) {
+    if (sevenZipModel.getFiles().length > 0 && sevenZipModel.getCodersInfo() != null
+        && sevenZipModel.getCodersInfo().getFolders().length > 0) {
       calcRelationInFilesAndFolders();
     }
 

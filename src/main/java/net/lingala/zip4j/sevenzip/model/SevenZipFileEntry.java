@@ -132,7 +132,7 @@ public class SevenZipFileEntry {
   }
 
   public void setCrc(long crc) {
-    this.crc = crc;
+    this.crc = crc & 0xffffffffL;
   }
 
   public long getCompressedCrc() {

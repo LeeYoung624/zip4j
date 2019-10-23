@@ -79,13 +79,6 @@ public class SevenZipHeaderUtilTest {
     testData[0] = (byte)0xff;
     assertThat(SevenZipHeaderUtil.readSevenZipUint64(new ByteArrayInputStream(testData))).isEqualTo(0x00ffffffffffffffffL);
   }
-
-  private void cleanUpTestFileAndWriteData(byte[] dataToWrite) throws IOException {
-    cleanUpTestFile();
-    FileOutputStream outputStream = new FileOutputStream(testFile);
-    outputStream.write(dataToWrite);
-    outputStream.close();
-  }
   
   @Test
   public void testGetFolderUnpackSize() {
@@ -146,9 +139,11 @@ public class SevenZipHeaderUtilTest {
     long[] packedStreams = { 0 };
     folder.setPackedStreams(packedStreams);
 
-    Coder coder = new Coder();
-    Coder[] coders = new Coder[1];
-    coders[0] = coder;
+    Coder coder0 = new Coder();
+    Coder coder1 = new Coder();
+    Coder[] coders = new Coder[2];
+    coders[0] = coder0;
+    coders[1] = coder1;
     folder.setCoders(coders);
 
     BindPair bindPair = new BindPair();
@@ -159,11 +154,10 @@ public class SevenZipHeaderUtilTest {
     bindPairs[0] = bindPair;
     folder.setBindPairs(bindPairs);
 
-    long packedStreamIndex = 0;
     List<Coder> coderList = SevenZipHeaderUtil.getOrderedCodersInFolder(folder);
     assertThat(coderList).isNotNull();
-    assertThat(coderList.size()).isEqualTo(1);
-    assertThat(coderList.get(0)).isEqualTo(coder);
+    assertThat(coderList.size()).isEqualTo(2);
+    assertThat(coderList.get(0)).isEqualTo(coder0);
   }
 
   @Test
